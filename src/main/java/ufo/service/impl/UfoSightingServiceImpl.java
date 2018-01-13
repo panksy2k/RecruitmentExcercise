@@ -46,7 +46,7 @@ public class UfoSightingServiceImpl implements UfoSightingService {
         List<UfoSighting> ufoSightingSearchList = readUfoSightings();
         List<UfoSighting> ufoSightingOnPeriod = getSightingsByDuration(ufoSightingSearchList,
                 ufoSighting -> ufoSighting != null,
-                ufoSight -> NULLSAFEGET.apply(ufoSight.getDateSeen()).contains(String.valueOf(yearSeen).concat(String.valueOf(monthSeen))));
+                ufoSight -> NULLSAFEGET.apply(ufoSight.getDateSeen()).contains(String.join("", String.valueOf(yearSeen), String.valueOf((monthSeen)))));
 
         return ufoSightingOnPeriod == null ? Collections.emptyList() : ufoSightingOnPeriod;
     }
