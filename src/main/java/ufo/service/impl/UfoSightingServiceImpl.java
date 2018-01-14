@@ -7,6 +7,7 @@ import ufo.service.UfoSightingService;
 import ufo.util.DateUtil;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -43,8 +44,7 @@ public class UfoSightingServiceImpl implements UfoSightingService {
         boolean isValidYearMonth = DateUtil.isValidYearMonth(yearSeen, monthSeen);
         if (!isValidYearMonth) throw new IllegalArgumentException("Year/Month parameters for search are not valid");
 
-        List<UfoSighting> ufoSightingSearchList = readUfoSightings();
-        List<UfoSighting> ufoSightingOnPeriod = getSightingsByDuration(ufoSightingSearchList,
+        List<UfoSighting> ufoSightingOnPeriod = getSightingsByDuration(
                 ufoSighting -> ufoSighting != null,
                 ufoSight -> NULLSAFEGET.apply(ufoSight.getDateSeen()).contains(String.join("", String.valueOf(yearSeen), String.valueOf((monthSeen)))));
 
@@ -56,7 +56,6 @@ public class UfoSightingServiceImpl implements UfoSightingService {
 
         try (Stream<String> lines = Files.lines(ufoFilePath)) {
             ufoSightingList = lines
-                    //.peek(line -> System.out.println(line.split("\t")[4]))
                     .map(line -> {
                         String[] lineToken = line.split("\t");
 
@@ -77,11 +76,31 @@ public class UfoSightingServiceImpl implements UfoSightingService {
         return ufoSightingList == null ? Collections.emptyList() : ufoSightingList;
     }
 
-    private List<UfoSighting> getSightingsByDuration(List<UfoSighting> sightings, Predicate<UfoSighting> notNullable, Predicate<UfoSighting> yearMonthSight) {
-        return sightings.stream()
-                .filter(notNullable)
-                .filter(yearMonthSight)
-                .collect(Collectors.toList());
+    private List<UfoSighting> getSightingsByDuration(Predicate<UfoSighting> notNullable, Predicate<UfoSighting> yearMonthSight) {
+        List<UfoSighting> ufoSightingBySearchCriteria = null;
+
+        try (Stream<String> lines = Files.lines(ufoFilePath)) {
+            ufoSightingBySearchCriteria = lines
+                    .map(line -> {
+                        String[] lineToken = line.split("\t");
+
+                        if (lineToken.length != 6) {
+                            sightingErrorRepository.offer(Stream.of(lineToken).collect(Collectors.joining(",")));
+                            LOG.info("The UFO entry in file has {} entries (hence skipped)", lineToken.length);
+                            return null;
+                        }
+
+                        return parseTokens(lineToken);
+                    })
+                    .filter(notNullable)
+                    .filter(yearMonthSight)
+                    .collect(Collectors.toList());
+        } catch (IOException ioe) {
+            LOG.error("Error whilst reading feed file");
+            throw new RuntimeException("Error whilst reading feed file", ioe);
+        }
+
+        return ufoSightingBySearchCriteria;
     }
 
     private UfoSighting parseTokens(String[] lineToken) {
